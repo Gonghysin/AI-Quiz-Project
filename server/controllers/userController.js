@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const jwt = require('jsonwebtoken');
 
 // 注册
 exports.register = async (req, res) => {
@@ -52,9 +51,6 @@ exports.login = async (req, res) => {
       return res.status(404).json({ message: '用户不存在' });
     }
 
-    // 生成token
-    const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, { expiresIn: '4h' });
-
     res.status(200).json({
       message: '登录成功',
       user: {
@@ -62,8 +58,7 @@ exports.login = async (req, res) => {
         nickname: user.nickname,
         totalScore: user.totalScore,
         questionsCompleted: user.questionsCompleted
-      },
-      token
+      }
     });
   } catch (error) {
     res.status(500).json({ message: '服务器错误', error: error.message });
