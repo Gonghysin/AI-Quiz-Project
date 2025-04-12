@@ -8,6 +8,10 @@ const routes = [
     component: Home
   },
   {
+    path: '/home',
+    redirect: '/'
+  },
+  {
     path: '/match',
     name: 'match',
     component: () => import('../views/Match.vue')
