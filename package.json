@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
+<<<<<<< HEAD
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
@@ -20,3 +21,18 @@
         "vite": "^4.4.6"
     }
 }
+=======
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview"
+    },
+    "dependencies": {
+      "vue": "^3.3.4",
+      "vue-router": "^4.2.4"
+    },
+    "devDependencies": {
+      "@vitejs/plugin-vue": "^4.2.3",
+      "vite": "^4.4.6"
+    }
+  }
+>>>>>>> d3f23ecd58a273d6f2f4a86240bbc0a6d88a4d98
