@@ -1,14 +1,18 @@
 const mongoose = require('mongoose');
 
+// 定义用户模式
 const userSchema = new mongoose.Schema({
-  userId: {
+  id2050: {
     type: String,
     required: true,
-    unique: true
+    unique: true, // 确保2050 ID唯一
+    trim: true
   },
   nickname: {
     type: String,
-    required: true
+    required: true,
+    unique: true, // 确保昵称唯一
+    trim: true
   },
   totalScore: {
     type: Number,
@@ -22,8 +26,8 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: []
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: true }); // 添加创建时间和更新时间
 
-module.exports = mongoose.model('User', userSchema); 
+// 创建并导出用户模型
+const User = mongoose.model('User', userSchema);
+module.exports = User; 
