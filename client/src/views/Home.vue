@@ -211,6 +211,18 @@
             <button class="login-button" @click="handleLogin">开始挑战</button>
           </div>
         </div>
+
+        <!-- 底部导航 -->
+        <div class="bottom-nav">
+          <button class="nav-button leaderboard" @click="navigateTo('leaderboard')">
+            <span class="icon">🏆</span>
+            <span>排行榜</span>
+          </button>
+          <button class="nav-button rewards" @click="navigateTo('rewards')">
+            <span class="icon">🎁</span>
+            <span>查看奖励</span>
+          </button>
+        </div>
       </div>
     </div>
   </template>
@@ -236,6 +248,9 @@
       },
       toggleScenario(scenario) {
         this.openScenarios[scenario] = !this.openScenarios[scenario];
+      },
+      navigateTo(route) {
+        this.$router.push({ name: route });
       }
     }
   }
@@ -597,6 +612,65 @@
     
     .scenario-desc p {
       font-size: 14px;
+    }
+  }
+
+  /* 底部导航 */
+  .bottom-nav {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 60px;
+    padding: 20px;
+  }
+
+  .nav-button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 32px;
+    border: none;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    color: #1d1d1f;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+  }
+
+  .nav-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  }
+
+  .nav-button .icon {
+    font-size: 24px;
+  }
+
+  .nav-button.leaderboard:hover {
+    background: #5856d6;
+    color: white;
+  }
+
+  .nav-button.rewards:hover {
+    background: #ff9500;
+    color: white;
+  }
+
+  @media (max-width: 768px) {
+    .bottom-nav {
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 40px;
+    }
+    
+    .nav-button {
+      width: 100%;
+      justify-content: center;
+      padding: 20px 32px;
     }
   }
   </style>
