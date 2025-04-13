@@ -3,11 +3,11 @@ const User = require('../models/User');
 // 用户注册控制器
 exports.register = async (req, res) => {
   try {
-    const { id2050, nickname } = req.body;
+    const { userId, nickname } = req.body;
 
     // 基础验证
-    if (!id2050 || !nickname) {
-      return res.status(400).json({ success: false, message: '请提供ID2050和昵称' });
+    if (!userId || !nickname) {
+      return res.status(400).json({ success: false, message: '请提供用户ID和昵称' });
     }
 
     // 检查昵称是否已存在
@@ -16,15 +16,15 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: '该昵称已被使用' });
     }
 
-    // 检查ID2050是否已存在
-    const existingId2050 = await User.findOne({ id2050 });
-    if (existingId2050) {
-      return res.status(400).json({ success: false, message: '该ID2050已注册' });
+    // 检查用户ID是否已存在
+    const existingUserId = await User.findOne({ userId });
+    if (existingUserId) {
+      return res.status(400).json({ success: false, message: '该用户ID已注册' });
     }
 
     // 创建新用户
     const newUser = new User({
-      id2050,
+      userId,
       nickname
     });
 
@@ -37,7 +37,7 @@ exports.register = async (req, res) => {
       message: '注册成功',
       user: {
         id: newUser._id,
-        id2050: newUser.id2050,
+        userId: newUser.userId,
         nickname: newUser.nickname
       }
     });
@@ -50,15 +50,15 @@ exports.register = async (req, res) => {
 // 用户登录控制器
 exports.login = async (req, res) => {
   try {
-    const { id2050 } = req.body;
+    const { userId } = req.body;
 
     // 基础验证
-    if (!id2050) {
-      return res.status(400).json({ success: false, message: '请提供ID2050' });
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '请提供用户ID' });
     }
 
-    // 根据ID2050查询用户
-    const user = await User.findOne({ id2050 });
+    // 根据用户ID查询用户
+    const user = await User.findOne({ userId });
     
     // 检查用户是否存在
     if (!user) {

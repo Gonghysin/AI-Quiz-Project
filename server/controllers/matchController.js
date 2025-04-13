@@ -34,18 +34,26 @@ exports.createMatch = async (req, res) => {
     
     // 创建新的比赛实例
     const newMatch = new Match({
-      user1_id,              // 设置创建者ID
-      user2_id: null,        // 初始时对手为空
-      user1_strategy: null,  // 初始时策略为空
-      user2_strategy: null,  // 初始时策略为空
-      user1_questions: [],   // 初始时题目为空数组
-      user2_questions: [],   // 初始时题目为空数组
-      user1_answers: [],     // 初始时答案为空数组
-      user2_answers: [],     // 初始时答案为空数组
-      user1_score: 0,        // 初始时分数为0
-      user2_score: 0,        // 初始时分数为0
-      current_round: 1,      // 设置当前回合为第1回合
-      status: 'waiting'      // 设置初始状态为等待中
+      user1_id,                // 设置创建者ID
+      user2_id: null,          // 初始时对手为空
+      strategies: {            // 初始化两轮策略
+        round1: {
+          user1: null,
+          user2: null
+        },
+        round2: {
+          user1: null,
+          user2: null
+        }
+      },
+      user1_questions: [],     // 初始时题目为空数组
+      user2_questions: [],     // 初始时题目为空数组
+      user1_answers: [],       // 初始时答案为空数组
+      user2_answers: [],       // 初始时答案为空数组
+      user1_score: 0,          // 初始时分数为0
+      user2_score: 0,          // 初始时分数为0
+      current_round: 1,        // 设置当前回合为第1回合
+      status: 'waiting'        // 设置初始状态为等待中
     });
     
     // 保存比赛到数据库
@@ -123,23 +131,32 @@ exports.joinMatch = async (req, res) => {
 };
 
 /**
- * 选择策略（给对方选难度）
- * @route POST /api/match/:id/choose-strategy
+ * 选择策略（给对方选择题目难度）
+ * @route POST /api/match/:id/choose-strategy/:round
  * @param {string} req.params.id - 比赛ID
+ * @param {string} req.params.round - 回合数(1或2)
  * @param {string} req.body.userId - 玩家ID
  * @param {string} req.body.strategy - 策略选择（'cooperate'或'betray'）
  * @returns {Object} 返回确认状态
  */
 exports.chooseStrategy = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, round } = req.params;
     const { userId, strategy } = req.body;
     
     // 基本验证
-    if (!id || !userId || !strategy) {
+    if (!id || !userId || !strategy || !round) {
       return res.status(400).json({
         success: false,
         message: '缺少必要参数'
+      });
+    }
+    
+    // 验证轮次是否有效
+    if (round !== '1' && round !== '2') {
+      return res.status(400).json({
+        success: false,
+        message: '无效的回合数，必须是1或2'
       });
     }
     
@@ -161,11 +178,13 @@ exports.chooseStrategy = async (req, res) => {
       });
     }
     
+    const roundKey = `round${round}`;
+    
     // 确定是哪位玩家并更新对应的策略
     if (userId == match.user1_id) {
-      match.user1_strategy = strategy;
+      match.strategies[roundKey].user1 = strategy;
     } else if (userId == match.user2_id) {
-      match.user2_strategy = strategy;
+      match.strategies[roundKey].user2 = strategy;
     } else {
       return res.status(403).json({
         success: false,
@@ -173,8 +192,9 @@ exports.chooseStrategy = async (req, res) => {
       });
     }
     
-    // 如果两位玩家都选择了策略，比赛状态改为进行中
-    if (match.user1_strategy && match.user2_strategy) {
+    // 如果当前回合双方都选择了策略，比赛状态改为进行中
+    const currentRoundKey = `round${match.current_round}`;
+    if (match.strategies[currentRoundKey].user1 && match.strategies[currentRoundKey].user2) {
       match.status = 'in_progress';
     }
     
@@ -205,13 +225,13 @@ exports.chooseStrategy = async (req, res) => {
  */
 exports.requestMatch = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.body.userId; // 从请求体获取userId，而不是从认证中间件
     const { targetId } = req.body; // 对手的2050 ID
 
-    if (!targetId) {
+    if (!userId || !targetId) {
       return res.status(400).json({
         success: false,
-        message: '请提供对手的2050 ID'
+        message: '请提供用户ID和对手ID'
       });
     }
 
@@ -312,7 +332,14 @@ exports.requestMatch = async (req, res) => {
  */
 exports.cancelMatch = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.body.userId; // 从请求体获取userId
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供用户ID'
+      });
+    }
     
     // 检查用户是否在匹配队列中
     if (!matchQueue[userId]) {
@@ -348,7 +375,14 @@ exports.cancelMatch = async (req, res) => {
  */
 exports.getMatchStatus = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.query.userId; // 从查询参数获取userId
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供用户ID'
+      });
+    }
     
     // 检查是否在匹配队列中
     if (matchQueue[userId]) {
@@ -444,26 +478,46 @@ exports.getQuestions = async (req, res) => {
       });
     }
     
-    // 确定对手
+    // 确定对手和当前轮次
     const isUser1 = userId == match.user1_id;
-    const opponentStrategy = isUser1 ? match.user2_strategy : match.user1_strategy;
+    const currentRound = match.current_round;
+    const roundKey = `round${currentRound}`;
     
-    // 确定题目难度
+    // 确定对手的策略（对手给自己选的难度）
+    const opponentStrategy = isUser1 
+      ? match.strategies[roundKey].user2 
+      : match.strategies[roundKey].user1;
+    
+    // 根据对手策略确定题目难度（cooperate=简单题，betray=难题）
     const difficulty = opponentStrategy === 'cooperate' ? 'easy' : 'hard';
     
-    // TODO: 从题库中抽取50道指定难度的题目
-    // 这里先模拟50道题
-    const questions = Array(50).fill().map((_, i) => ({
-      id: `q${i}`,
-      questionText: `${difficulty}难度的问题${i+1}`,
-      options: ['A', 'B', 'C', 'D'],
-      type: 'single'
-    }));
+    // 从数据库中随机抽取50道指定难度的题目
+    const Question = require('../models/Question');
+    const questions = await Question.aggregate([
+      { $match: { difficulty } },
+      { $sample: { size: 50 } },
+      { 
+        $project: { 
+          _id: 1, 
+          questionText: 1, 
+          options: 1, 
+          type: 1,
+          difficulty: 1
+          // 不返回 answer 字段
+        } 
+      }
+    ]);
+    
+    // 确保有足够的题目
+    if (questions.length < 50) {
+      console.warn(`警告: 难度为 ${difficulty} 的题目不足50道，仅返回 ${questions.length} 道题`);
+    }
     
     return res.status(200).json({
       success: true,
       questions,
-      currentRound: match.current_round
+      currentRound: match.current_round,
+      difficulty
     });
     
   } catch (error) {
@@ -490,10 +544,10 @@ exports.submitAnswers = async (req, res) => {
     const { userId, answers } = req.body;
     
     // 基本验证
-    if (!id || !userId || !answers || !Array.isArray(answers)) {
+    if (!id || !userId || !answers || !Array.isArray(answers) || answers.length !== 2) {
       return res.status(400).json({
         success: false,
-        message: '缺少必要参数或格式不正确'
+        message: '缺少必要参数或格式不正确，需要提供两个答案'
       });
     }
     
@@ -517,26 +571,99 @@ exports.submitAnswers = async (req, res) => {
       });
     }
     
+    // 检查比赛状态
+    if (match.status === 'finished') {
+      return res.status(400).json({
+        success: false,
+        message: '比赛已结束，无法提交答案'
+      });
+    }
+    
+    // 检查是否已提交过答案
+    const userAnswersField = isUser1 ? 'user1_answers' : 'user2_answers';
+    const currentRoundIndex = (match.current_round - 1) * 2;
+    
+    if (match[userAnswersField] && 
+        match[userAnswersField].length >= (match.current_round * 2)) {
+      return res.status(400).json({
+        success: false,
+        message: '本轮答案已提交，不能重复提交'
+      });
+    }
+    
     // 更新玩家答案
     if (isUser1) {
+      // 确保数组长度足够
+      while (match.user1_answers.length < currentRoundIndex) {
+        match.user1_answers.push(null);
+      }
       match.user1_answers = match.user1_answers.concat(answers);
     } else {
+      while (match.user2_answers.length < currentRoundIndex) {
+        match.user2_answers.push(null);
+      }
       match.user2_answers = match.user2_answers.concat(answers);
     }
     
-    // 检查是否双方都提交了答案
-    const currentRoundAnswers1 = match.user1_answers.length / 2;
-    const currentRoundAnswers2 = match.user2_answers.length / 2;
+    // 检查是否双方都提交了当前回合的答案
+    const user1RoundAnswers = match.user1_answers.length / 2;
+    const user2RoundAnswers = match.user2_answers.length / 2;
     
     let roundComplete = false;
+    let roundScores = { user1: 0, user2: 0 };
+    let correctAnswers = { user1: [false, false], user2: [false, false] };
     
     // 如果双方都完成了当前回合
-    if (currentRoundAnswers1 >= match.current_round && currentRoundAnswers2 >= match.current_round) {
+    if (user1RoundAnswers >= match.current_round && user2RoundAnswers >= match.current_round) {
       roundComplete = true;
       
-      // TODO: 计算得分逻辑
-      // 这里简化处理，假设答对一题得1分
-      // 实际应根据文档中的计分规则实现
+      // 获取当前轮次
+      const currentRound = match.current_round;
+      const roundKey = `round${currentRound}`;
+      
+      // 获取双方策略
+      const user1Strategy = match.strategies[roundKey].user1;
+      const user2Strategy = match.strategies[roundKey].user2;
+      
+      // 获取本轮答案
+      const user1Answers = match.user1_answers.slice((currentRound-1)*2, currentRound*2);
+      const user2Answers = match.user2_answers.slice((currentRound-1)*2, currentRound*2);
+      
+      // 假设我们有题目的正确答案（实际应该从题目数据中获取）
+      // 这里简化处理，假设有user1_questions和user2_questions字段包含题目信息
+      const user1Questions = match.user1_questions.slice((currentRound-1)*2, currentRound*2);
+      const user2Questions = match.user2_questions.slice((currentRound-1)*2, currentRound*2);
+      
+      // 确定答题正确性
+      for (let i = 0; i < 2; i++) {
+        // 这里假设每个题目对象有一个answer字段表示正确答案
+        // 实际情况可能需要调整此逻辑
+        if (user1Questions[i] && user1Answers[i]) {
+          correctAnswers.user1[i] = user1Questions[i].answer.includes(user1Answers[i]);
+        }
+        
+        if (user2Questions[i] && user2Answers[i]) {
+          correctAnswers.user2[i] = user2Questions[i].answer.includes(user2Answers[i]);
+        }
+      }
+      
+      // 计算得分
+      for (let i = 0; i < 2; i++) {
+        // 应用计分规则
+        const [user1Score, user2Score] = calculateScore(
+          correctAnswers.user1[i],
+          correctAnswers.user2[i],
+          user1Strategy,
+          user2Strategy
+        );
+        
+        roundScores.user1 += user1Score;
+        roundScores.user2 += user2Score;
+      }
+      
+      // 更新总得分
+      match.user1_score = (match.user1_score || 0) + roundScores.user1;
+      match.user2_score = (match.user2_score || 0) + roundScores.user2;
       
       // 进入下一回合或结束比赛
       if (match.current_round < 2) {
@@ -549,13 +676,26 @@ exports.submitAnswers = async (req, res) => {
     // 保存更新后的比赛
     await match.save();
     
-    return res.status(200).json({
-      success: true,
-      message: '答案提交成功',
-      roundComplete,
-      matchStatus: match.status,
-      currentRound: match.current_round
-    });
+    if (roundComplete) {
+      return res.status(200).json({
+        success: true,
+        message: '答案提交成功，双方本轮得分已计算',
+        user1_score: match.user1_score,
+        user2_score: match.user2_score,
+        current_round_scores: roundScores,
+        round: match.current_round - 1,
+        user1_correct: correctAnswers.user1,
+        user2_correct: correctAnswers.user2,
+        matchStatus: match.status
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        message: '答案提交成功，等待对手提交',
+        matchStatus: match.status,
+        currentRound: match.current_round
+      });
+    }
     
   } catch (error) {
     console.error('提交答案失败:', error);
@@ -566,6 +706,71 @@ exports.submitAnswers = async (req, res) => {
     });
   }
 };
+
+/**
+ * 计算单题得分
+ * @param {Boolean} user1Correct - 用户1是否答对
+ * @param {Boolean} user2Correct - 用户2是否答对
+ * @param {String} user1Strategy - 用户1策略 ('cooperate'|'betray')
+ * @param {String} user2Strategy - 用户2策略 ('cooperate'|'betray')
+ * @returns {Array} - [用户1得分, 用户2得分]
+ */
+function calculateScore(user1Correct, user2Correct, user1Strategy, user2Strategy) {
+  // 双方都合作
+  if (user1Strategy === 'cooperate' && user2Strategy === 'cooperate') {
+    if (user1Correct && user2Correct) {
+      return [3, 3]; // 双方都答对
+    } else if (user1Correct && !user2Correct) {
+      return [3, 0]; // 用户1对，用户2错
+    } else if (!user1Correct && user2Correct) {
+      return [0, 3]; // 用户1错，用户2对
+    } else {
+      return [0, 0]; // 双方都答错
+    }
+  }
+  
+  // 双方都背叛
+  if (user1Strategy === 'betray' && user2Strategy === 'betray') {
+    if (user1Correct && user2Correct) {
+      return [2, 2]; // 双方都答对
+    } else if (user1Correct && !user2Correct) {
+      return [5, 0]; // 用户1对，用户2错
+    } else if (!user1Correct && user2Correct) {
+      return [0, 5]; // 用户1错，用户2对
+    } else {
+      return [0, 0]; // 双方都答错
+    }
+  }
+  
+  // 用户1背叛，用户2合作
+  if (user1Strategy === 'betray' && user2Strategy === 'cooperate') {
+    if (user1Correct && user2Correct) {
+      return [2, 4]; // 双方都答对
+    } else if (user1Correct && !user2Correct) {
+      return [5, 0]; // 用户1对，用户2错
+    } else if (!user1Correct && user2Correct) {
+      return [0, 6]; // 用户1错，用户2对
+    } else {
+      return [0, 1]; // 双方都答错
+    }
+  }
+  
+  // 用户1合作，用户2背叛
+  if (user1Strategy === 'cooperate' && user2Strategy === 'betray') {
+    if (user1Correct && user2Correct) {
+      return [4, 2]; // 双方都答对
+    } else if (user1Correct && !user2Correct) {
+      return [6, 0]; // 用户1对，用户2错
+    } else if (!user1Correct && user2Correct) {
+      return [0, 5]; // 用户1错，用户2对
+    } else {
+      return [1, 0]; // 双方都答错
+    }
+  }
+  
+  // 默认情况
+  return [0, 0];
+}
 
 /**
  * 获取对手当前回合进度
@@ -672,16 +877,7 @@ exports.getMatchResults = async (req, res) => {
           user2_correct: [false, true]
         }
       ],
-      strategies: {
-        round1: { 
-          user1: match.user1_strategy, 
-          user2: match.user2_strategy 
-        },
-        round2: { 
-          user1: match.user1_strategy, 
-          user2: match.user2_strategy 
-        }
-      }
+      strategies: match.strategies // 直接使用新的strategies结构
     };
     
     return res.status(200).json({
@@ -694,6 +890,114 @@ exports.getMatchResults = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '服务器错误，获取比赛结果失败',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 锁定题目
+ * @route POST /api/match/:id/lock-questions
+ * @param {string} req.params.id - 比赛ID
+ * @param {string} req.body.userId - 用户ID
+ * @param {Array} req.body.questionIds - 所选题目ID数组（两道题）
+ * @returns {Object} 返回确认状态
+ */
+exports.lockQuestions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, questionIds } = req.body;
+    
+    // 基本参数验证
+    if (!id || !userId || !questionIds) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数'
+      });
+    }
+    
+    // 验证选择的题目数量是否正确（每轮两道题）
+    if (!Array.isArray(questionIds) || questionIds.length !== 2) {
+      return res.status(400).json({
+        success: false,
+        message: '每轮必须选择两道题目'
+      });
+    }
+    
+    // 查找比赛
+    const match = await Match.findById(id);
+    
+    if (!match) {
+      return res.status(404).json({
+        success: false,
+        message: '比赛不存在'
+      });
+    }
+    
+    // 确保比赛状态为进行中
+    if (match.status !== 'in_progress') {
+      return res.status(400).json({
+        success: false,
+        message: '比赛未在进行中状态，无法锁定题目'
+      });
+    }
+    
+    // 从数据库中获取选定的题目
+    const Question = require('../models/Question');
+    const selectedQuestions = await Question.find({
+      _id: { $in: questionIds }
+    });
+    
+    // 验证是否找到了所有指定的题目
+    if (selectedQuestions.length !== 2) {
+      return res.status(404).json({
+        success: false,
+        message: '无法找到指定的题目'
+      });
+    }
+    
+    // 确定是哪位玩家并更新其题目
+    if (userId == match.user1_id) {
+      // 检查用户1是否已经锁定过题目
+      if (match.user1_questions && match.user1_questions.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: '您已经锁定过本轮题目'
+        });
+      }
+      // 更新用户1的题目
+      match.user1_questions = selectedQuestions;
+    } else if (userId == match.user2_id) {
+      // 检查用户2是否已经锁定过题目
+      if (match.user2_questions && match.user2_questions.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: '您已经锁定过本轮题目'
+        });
+      }
+      // 更新用户2的题目
+      match.user2_questions = selectedQuestions;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: '您不是该比赛的参与者'
+      });
+    }
+    
+    // 保存更新后的比赛信息
+    await match.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: '题目锁定成功',
+      questions: selectedQuestions
+    });
+    
+  } catch (error) {
+    console.error('锁定题目失败:', error);
+    return res.status(500).json({
+      success: false,
+      message: '服务器错误，锁定题目失败',
       error: error.message
     });
   }

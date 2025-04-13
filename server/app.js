@@ -28,7 +28,7 @@ console.log("当前加载的matchRoutes路径:", require.resolve('./routes/match
 console.log("当前加载的questionRoutes路径:", require.resolve('./routes/questionRoutes'));
 
 // 数据库连接
-mongoose.connect('mongodb://localhost:27017/ai-quiz', {
+mongoose.connect('mongodb://localhost:27017/ai-quiz-app', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
