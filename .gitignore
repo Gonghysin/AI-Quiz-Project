@@ -542,3 +542,9 @@ node_modules/vue/server-renderer/index.mjs
 node_modules/vue/server-renderer/package.json
 
 node_modules/.vue-global-types/
+<<<<<<< HEAD
+
+# Node modules (完整目录)
+node_modules/
+=======
+>>>>>>> d3f23ecd58a273d6f2f4a86240bbc0a6d88a4d98
