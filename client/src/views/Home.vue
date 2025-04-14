@@ -207,8 +207,16 @@
               v-model="userId" 
               placeholder="请输入您的2050 ID" 
               class="id-input"
+              :disabled="loading"
             />
-            <button class="login-button" @click="handleLogin">开始挑战</button>
+            <button 
+              class="login-button" 
+              @click="handleLogin"
+              :disabled="loading"
+            >
+              {{ loading ? '登录中...' : '开始挑战' }}
+            </button>
+            <p v-if="error" class="error-message">{{ error }}</p>
           </div>
         </div>
 
@@ -233,17 +241,53 @@
     data() {
       return {
         userId: '',
+        nickname: '',
         openScenarios: {
           A: false,
           B: false,
           C: false
-        }
+        },
+        loading: false,
+        error: ''
       }
     },
     methods: {
-      handleLogin() {
-        if (this.userId.trim()) {
+      async handleLogin() {
+        if (!this.userId.trim()) {
+          this.error = '请输入2050 ID';
+          return;
+        }
+        
+        try {
+          this.loading = true;
+          this.error = '';
+          
+          // 调用登录接口
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId: this.userId.trim() })
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.message || '登录失败，请重试');
+          }
+          
+          // 保存用户信息到本地存储
+          localStorage.setItem('userId', data.userId);
+          localStorage.setItem('nickname', data.nickname);
+          
+          // 重定向到匹配页面
           this.$router.push({ name: 'match' });
+        } catch (err) {
+          this.error = err.message || '登录时发生错误，请重试';
+          console.error('登录错误:', err);
+        } finally {
+          this.loading = false;
         }
       },
       toggleScenario(scenario) {
@@ -514,6 +558,21 @@
   .login-button:hover {
     background: #0066d6;
     transform: translateY(-2px);
+  }
+  
+  /* 登录按钮状态 */
+  .login-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  /* 错误消息 */
+  .error-message {
+    color: #ff3b30;
+    margin-top: 12px;
+    font-size: 14px;
+    text-align: center;
   }
   
   /* 响应式设计 */
