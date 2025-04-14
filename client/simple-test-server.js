@@ -119,17 +119,16 @@ app.post('/api/auth/login', (req, res) => {
 
 // 创建比赛API
 app.post('/api/match', (req, res) => {
-  const { user1_id, user2_id } = req.body;
+  const { user1_id } = req.body;
   
-  if (!user1_id || !user2_id) {
+  if (!user1_id) {
     return res.status(400).json({ message: '用户ID是必需的' });
   }
   
   // 查找用户
   const user1 = users.find(u => u.userId === user1_id);
-  const user2 = users.find(u => u.userId === user2_id);
   
-  if (!user1 || !user2) {
+  if (!user1) {
     return res.status(404).json({ message: '用户不存在' });
   }
   
@@ -138,7 +137,7 @@ app.post('/api/match', (req, res) => {
   const newMatch = {
     matchId,
     user1_id,
-    user2_id,
+    user2_id: null,
     user1_strategy: null,
     user2_strategy: null,
     user1_questions: [],
@@ -148,14 +147,49 @@ app.post('/api/match', (req, res) => {
     user1_score: 0,
     user2_score: 0,
     current_round: 1,
-    status: 'ready'
+    status: 'waiting'
   };
   
   matches.push(newMatch);
-  console.log(`比赛 ${matchId} 创建成功, 玩家: ${user1_id} vs ${user2_id}`);
+  console.log(`比赛 ${matchId} 创建成功, 玩家1: ${user1_id}`);
   
   return res.json({
     matchId,
+    status: 'waiting'
+  });
+});
+
+// 加入比赛API
+app.post('/api/match/join', (req, res) => {
+  // 支持两种参数名称：user2_id 或 userId
+  const userId = req.body.userId || req.body.user2_id;
+  
+  if (!userId) {
+    return res.status(400).json({ message: '用户ID是必需的' });
+  }
+  
+  // 查找用户
+  const user = users.find(u => u.userId === userId);
+  
+  if (!user) {
+    return res.status(404).json({ message: '用户不存在' });
+  }
+  
+  // 查找等待中的比赛
+  const waitingMatch = matches.find(m => m.status === 'waiting');
+  
+  if (!waitingMatch) {
+    return res.status(404).json({ message: '没有等待中的比赛' });
+  }
+  
+  // 更新比赛信息
+  waitingMatch.user2_id = userId;
+  waitingMatch.status = 'ready';
+  
+  console.log(`玩家 ${userId} 加入比赛 ${waitingMatch.matchId}`);
+  
+  return res.json({
+    matchId: waitingMatch.matchId,
     status: 'ready'
   });
 });
