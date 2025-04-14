@@ -5,34 +5,87 @@
     <!-- 页面标题 -->
     <header class="match-header">
       <h1>AI知识对战</h1>
+      <div class="user-display">
+        <span class="user-id-badge">ID: {{ myId }}</span>
+      </div>
       <div class="round-info" v-if="matchId">
         <span class="round-badge">第{{ currentRound }}轮</span>
         <span class="user-info">{{ myNickname }} vs {{ opponentNickname }}</span>
       </div>
     </header>
 
-    <!-- Step 1: 输入对手ID，创建比赛 -->
+    <!-- Step 1: 创建或加入房间 -->
     <div class="match-step" v-if="currentStep === 1">
       <div class="step-card">
-        <h2>Step 1: 输入对手ID</h2>
-        <p class="step-description">请输入你对手的2050 ID，开始一场囚徒困境对战！</p>
+        <h2>Step 1: 创建或加入房间</h2>
+        <p class="step-description">创建一个新房间或加入已有房间，开始一场囚徒困境对战！</p>
         
-        <div class="input-group">
-          <input 
-            type="text"
-            v-model="opponentId"
-            placeholder="对手的2050 ID"
-            :disabled="loading"
-            class="opponent-input"
-          />
-          <button 
-            @click="createMatch"
-            :disabled="!opponentId || loading"
-            class="action-button"
-          >
-            {{ loading ? '创建中...' : '创建比赛' }}
-          </button>
+        <div class="room-options">
+          <!-- 创建房间选项 -->
+          <div class="option-card" v-if="!showJoinRoom">
+            <h3>创建新房间</h3>
+            <p>创建一个新的游戏房间，等待对手加入</p>
+            <button 
+              @click="createRoom"
+              :disabled="loading"
+              class="action-button"
+            >
+              {{ loading ? '创建中...' : '创建房间' }}
+            </button>
+          </div>
+          
+          <!-- 加入房间选项 -->
+          <div class="option-card" v-if="!showJoinRoom">
+            <h3>加入已有房间</h3>
+            <p>输入对手ID加入游戏</p>
+            <button 
+              @click="showJoinRoom = true"
+              :disabled="loading"
+              class="action-button secondary"
+            >
+              加入对战
+            </button>
+          </div>
+          
+          <!-- 输入对手ID界面 -->
+          <div class="join-room-form" v-if="showJoinRoom">
+            <h3>加入对战</h3>
+            <div class="input-group">
+              <input 
+                type="text"
+                v-model="opponentId"
+                placeholder="请输入对手ID"
+                :disabled="loading"
+                class="room-input"
+              />
+              <div class="button-group">
+                <button 
+                  @click="joinRoomByOpponentId"
+                  :disabled="!opponentId || loading"
+                  class="action-button"
+                >
+                  {{ loading ? '加入中...' : '确认加入' }}
+                </button>
+                <button 
+                  @click="showJoinRoom = false"
+                  :disabled="loading"
+                  class="action-button secondary"
+                >
+                  返回
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+        
+        <!-- 房间创建成功后显示房间ID -->
+        <div class="room-info" v-if="matchId && currentStep === 1">
+          <h3>房间已创建</h3>
+          <p>房间ID: <span class="room-id">{{ matchId }}</span></p>
+          <p>等待对手加入...</p>
+          <div class="loader"></div>
+        </div>
+        
         <p v-if="error" class="error-message">{{ error }}</p>
       </div>
     </div>
@@ -290,6 +343,10 @@ export default {
       opponentId: '',
       opponentNickname: '对手',
       
+      // 房间相关
+      roomId: '',
+      showJoinRoom: false,
+      
       // 比赛状态
       matchId: null,
       currentStep: 1,
@@ -353,15 +410,58 @@ export default {
     }
   },
   methods: {
-    // Step 1: 创建比赛
-    async createMatch() {
+    // 加入房间（通过对手ID）
+    async joinRoomByOpponentId() {
       if (!this.opponentId || this.loading) return;
       
       this.loading = true;
       this.error = '';
       
       try {
-        // 修改为与后端要求一致的API调用，先创建比赛
+        // 按照文档要求，通过对手ID请求匹配
+        const requestResponse = await fetch('/api/match/request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: this.myId,
+            targetId: this.opponentId
+          })
+        });
+        
+        const requestData = await requestResponse.json();
+        
+        if (!requestResponse.ok) {
+          throw new Error(requestData.message || '匹配对手失败');
+        }
+        
+        // 保存比赛ID
+        this.matchId = requestData.matchId;
+        
+        // 获取对手昵称
+        this.opponentNickname = requestData.opponentNickname || `用户${this.opponentId}`;
+        
+        // 进入下一步
+        this.currentStep = 2;
+        
+      } catch (err) {
+        this.error = err.message || '加入对战时出错，请重试';
+        console.error('匹配对手错误:', err);
+      } finally {
+        this.loading = false;
+      }
+    },
+    
+    // 创建房间
+    async createRoom() {
+      if (this.loading) return;
+      
+      this.loading = true;
+      this.error = '';
+      
+      try {
+        // 创建比赛/房间
         const createResponse = await fetch('/api/match', {
           method: 'POST',
           headers: {
@@ -375,41 +475,43 @@ export default {
         const createData = await createResponse.json();
         
         if (!createResponse.ok) {
-          throw new Error(createData.message || '创建比赛失败');
+          throw new Error(createData.message || '创建房间失败');
         }
         
-        // 保存比赛ID
+        // 保存比赛/房间ID
         this.matchId = createData.matchId;
         
-        // 然后加入第二个玩家
-        const joinResponse = await fetch('/api/match/join', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user2_id: this.opponentId
-          })
-        });
-        
-        const joinData = await joinResponse.json();
-        
-        if (!joinResponse.ok) {
-          throw new Error(joinData.message || '添加对手失败');
-        }
-        
-        // 进入下一步
-        this.currentStep = 2;
-        
-        // 获取对手昵称（实际项目中应从响应中获取）
-        this.opponentNickname = `用户${this.opponentId}`;
+        // 开始轮询检查是否有玩家加入
+        this.startPollingForOpponent();
         
       } catch (err) {
-        this.error = err.message || '创建比赛时出错，请重试';
-        console.error('创建比赛错误:', err);
+        this.error = err.message || '创建房间时出错，请重试';
+        console.error('创建房间错误:', err);
       } finally {
         this.loading = false;
       }
+    },
+    
+    // 轮询检查是否有玩家加入
+    startPollingForOpponent() {
+      this.pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/match/${this.matchId}/progress?user=${this.myId}`);
+          const data = await response.json();
+          
+          // 检查是否有玩家加入
+          if (data.opponentJoined) {
+            // 有玩家加入，停止轮询，进入下一步
+            clearInterval(this.pollInterval);
+            this.currentStep = 2;
+            
+            // 获取对手昵称
+            this.opponentNickname = data.opponentNickname || '对手';
+          }
+        } catch (err) {
+          console.error('轮询错误:', err);
+        }
+      }, 2000); // 每2秒检查一次
     },
     
     // Step 2: 选择策略
@@ -464,8 +566,9 @@ export default {
           const response = await fetch(`/api/match/${this.matchId}/progress?user=${this.myId}`);
           const data = await response.json();
           
-          if (data.opponentSubmitted) {
-            // 对手已提交，停止轮询，准备进入下一步
+          // 检查对手是否提交了策略
+          if (data.opponentSubmittedStrategy) {
+            // 对手已提交策略，停止轮询，准备进入下一步
             this.bothReady = true;
             clearInterval(this.pollInterval);
             this.prepareForQuestionSelection();
@@ -544,7 +647,7 @@ export default {
           },
           body: JSON.stringify({
             userId: this.myId,
-            questions: this.selectedQuestions.map(q => q.id)
+            questions: this.selectedQuestions.map(q => q.questionId || q.id)
           })
         });
         
@@ -651,7 +754,7 @@ export default {
           const data = await response.json();
           
           if (data.opponentSubmitted) {
-            // 对手已提交，停止轮询，获取本轮结果
+            // 对手已提交答案，停止轮询，获取本轮结果
             clearInterval(this.pollInterval);
             this.fetchRoundResult();
           }
@@ -778,6 +881,108 @@ export default {
   height: 100%;
   background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 100%);
   z-index: -1;
+}
+
+/* 用户ID显示 */
+.user-display {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}
+
+.user-id-badge {
+  background: #007aff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.3);
+}
+
+/* 房间选项样式 */
+.room-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.option-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  width: 45%;
+  min-width: 250px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.option-card:hover {
+  transform: translateY(-5px);
+}
+
+.join-room-form {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  width: 100%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.room-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.action-button.secondary {
+  background-color: #6c757d;
+}
+
+.room-info {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.room-id {
+  font-weight: bold;
+  font-size: 1.2em;
+  color: #4a6cf7;
+  background: #f0f4ff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 0 5px;
+}
+
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 2s linear infinite;
+  margin: 15px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .match-header {
