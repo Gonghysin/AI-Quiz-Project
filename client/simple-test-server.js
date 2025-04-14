@@ -1,7 +1,7 @@
 // client/simple-test-server.js
 const express = require('express');
 const app = express();
-const PORT = 8080;
+const PORT = 5000;
 
 // 内存中存储用户数据
 const users = [

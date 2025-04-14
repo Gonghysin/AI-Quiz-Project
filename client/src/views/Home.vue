@@ -201,6 +201,22 @@
         
         <!-- 登录部分 -->
         <div class="login-section">
+          <div class="login-tabs">
+            <button 
+              class="tab-button" 
+              :class="{ active: !isRegister }"
+              @click="switchTab(false)"
+            >
+              登录
+            </button>
+            <button 
+              class="tab-button" 
+              :class="{ active: isRegister }"
+              @click="switchTab(true)"
+            >
+              注册
+            </button>
+          </div>
           <div class="login-form">
             <input 
               type="text" 
@@ -209,14 +225,23 @@
               class="id-input"
               :disabled="loading"
             />
+            <input 
+              v-if="isRegister"
+              type="text" 
+              v-model="nickname" 
+              placeholder="请输入您的昵称" 
+              class="id-input"
+              :disabled="loading"
+            />
             <button 
               class="login-button" 
-              @click="handleLogin"
-              :disabled="loading"
+              @click="isRegister ? handleRegister() : handleLogin()"
+              :disabled="loading || (isRegister && (!userId || !nickname)) || (!isRegister && !userId)"
             >
-              {{ loading ? '登录中...' : '开始挑战' }}
+              {{ loading ? (isRegister ? '注册中...' : '登录中...') : (isRegister ? '注册' : '开始挑战') }}
             </button>
             <p v-if="error" class="error-message">{{ error }}</p>
+            <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
           </div>
         </div>
 
@@ -248,7 +273,9 @@
           C: false
         },
         loading: false,
-        error: ''
+        error: '',
+        successMessage: '',
+        isRegister: false
       }
     },
     methods: {
@@ -261,6 +288,7 @@
         try {
           this.loading = true;
           this.error = '';
+          this.successMessage = '';
           
           // 调用登录接口
           const response = await fetch('/api/auth/login', {
@@ -290,11 +318,54 @@
           this.loading = false;
         }
       },
+      async handleRegister() {
+        if (!this.userId.trim() || !this.nickname.trim()) {
+          this.error = '请输入完整的用户信息';
+          return;
+        }
+        
+        try {
+          this.loading = true;
+          this.error = '';
+          this.successMessage = '';
+          
+          // 调用注册接口
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId: this.userId.trim(), nickname: this.nickname.trim() })
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.message || '注册失败，请重试');
+          }
+          
+          // 显示成功消息，并自动切换到登录页
+          this.successMessage = '注册成功！请登录开始游戏';
+          setTimeout(() => {
+            this.isRegister = false;
+          }, 1500);
+        } catch (err) {
+          this.error = err.message || '注册时发生错误，请重试';
+          console.error('注册错误:', err);
+        } finally {
+          this.loading = false;
+        }
+      },
       toggleScenario(scenario) {
         this.openScenarios[scenario] = !this.openScenarios[scenario];
       },
       navigateTo(route) {
         this.$router.push({ name: route });
+      },
+      switchTab(isRegister) {
+        this.isRegister = isRegister;
+        this.error = '';
+        this.successMessage = '';
       }
     }
   }
@@ -528,15 +599,50 @@
     margin: 0 auto;
   }
   
+  .login-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  
+  .tab-button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f5f5f7;
+    color: #494949;
+    margin: 0 5px;
+    min-width: 100px;
+  }
+  
+  .tab-button.active {
+    background: #007aff;
+    color: white;
+    box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3);
+    font-weight: 600;
+  }
+  
+  .tab-button:hover:not(.active) {
+    background: #e6e6e6;
+  }
+  
   .login-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
   }
   
   .id-input {
     padding: 16px 20px;
-    font-size: 18px;
+    font-size: 16px;
     border-radius: 12px;
     border: none;
     background: white;
@@ -553,6 +659,7 @@
     color: white;
     cursor: pointer;
     transition: all 0.3s ease;
+    margin-top: 10px;
   }
   
   .login-button:hover {
@@ -570,6 +677,14 @@
   /* 错误消息 */
   .error-message {
     color: #ff3b30;
+    margin-top: 12px;
+    font-size: 14px;
+    text-align: center;
+  }
+  
+  /* 成功消息 */
+  .success-message {
+    color: #34c759;
     margin-top: 12px;
     font-size: 14px;
     text-align: center;
