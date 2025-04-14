@@ -257,10 +257,20 @@ app.get('/api/match/:id/progress', (req, res) => {
     ? match.user2_answers.length >= match.current_round * 3
     : match.user1_answers.length >= match.current_round * 3;
   
+  // 检查对手是否已加入（用于房间创建者等待对手加入的场景）
+  const opponentJoined = isUser1 ? (match.user2_id !== null) : (match.user1_id !== null);
+  
+  // 获取对手昵称
+  const opponentUser = users.find(u => u.userId === opponentId);
+  const opponentNickname = opponentUser ? opponentUser.nickname : '对手';
+  
   return res.json({
     opponentSubmitted,
+    opponentJoined,
+    opponentNickname,
     opponentRoundScore: 0 // 简化实现，不计算分数
   });
+
 });
 
 // 获取问题API
