@@ -5,6 +5,9 @@
     <!-- 页面标题 -->
     <header class="match-header">
       <h1>AI知识对战</h1>
+      <div class="user-display">
+        <span class="user-id-badge">ID: {{ myId }}</span>
+      </div>
       <div class="round-info" v-if="matchId">
         <span class="round-badge">第{{ currentRound }}轮</span>
         <span class="user-info">{{ myNickname }} vs {{ opponentNickname }}</span>
@@ -34,31 +37,31 @@
           <!-- 加入房间选项 -->
           <div class="option-card" v-if="!showJoinRoom">
             <h3>加入已有房间</h3>
-            <p>输入房间ID加入已创建的游戏</p>
+            <p>输入对手ID加入游戏</p>
             <button 
               @click="showJoinRoom = true"
               :disabled="loading"
               class="action-button secondary"
             >
-              加入房间
+              加入对战
             </button>
           </div>
           
-          <!-- 输入房间ID界面 -->
+          <!-- 输入对手ID界面 -->
           <div class="join-room-form" v-if="showJoinRoom">
-            <h3>加入房间</h3>
+            <h3>加入对战</h3>
             <div class="input-group">
               <input 
                 type="text"
-                v-model="roomId"
-                placeholder="请输入房间ID"
+                v-model="opponentId"
+                placeholder="请输入对手ID"
                 :disabled="loading"
                 class="room-input"
               />
               <div class="button-group">
                 <button 
-                  @click="joinRoom"
-                  :disabled="!roomId || loading"
+                  @click="joinRoomByOpponentId"
+                  :disabled="!opponentId || loading"
                   class="action-button"
                 >
                   {{ loading ? '加入中...' : '确认加入' }}
@@ -407,6 +410,49 @@ export default {
     }
   },
   methods: {
+    // 加入房间（通过对手ID）
+    async joinRoomByOpponentId() {
+      if (!this.opponentId || this.loading) return;
+      
+      this.loading = true;
+      this.error = '';
+      
+      try {
+        // 按照文档要求，通过对手ID请求匹配
+        const requestResponse = await fetch('/api/match/request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: this.myId,
+            targetId: this.opponentId
+          })
+        });
+        
+        const requestData = await requestResponse.json();
+        
+        if (!requestResponse.ok) {
+          throw new Error(requestData.message || '匹配对手失败');
+        }
+        
+        // 保存比赛ID
+        this.matchId = requestData.matchId;
+        
+        // 获取对手昵称
+        this.opponentNickname = requestData.opponentNickname || `用户${this.opponentId}`;
+        
+        // 进入下一步
+        this.currentStep = 2;
+        
+      } catch (err) {
+        this.error = err.message || '加入对战时出错，请重试';
+        console.error('匹配对手错误:', err);
+      } finally {
+        this.loading = false;
+      }
+    },
+    
     // 创建房间
     async createRoom() {
       if (this.loading) return;
@@ -441,49 +487,6 @@ export default {
       } catch (err) {
         this.error = err.message || '创建房间时出错，请重试';
         console.error('创建房间错误:', err);
-      } finally {
-        this.loading = false;
-      }
-    },
-    
-    // 加入房间
-    async joinRoom() {
-      if (!this.roomId || this.loading) return;
-      
-      this.loading = true;
-      this.error = '';
-      
-      try {
-        // 加入比赛/房间
-        const joinResponse = await fetch('/api/match/join', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            userId: this.myId
-          })
-        });
-        
-        const joinData = await joinResponse.json();
-        
-        if (!joinResponse.ok) {
-          throw new Error(joinData.message || '加入房间失败');
-        }
-        
-        // 保存比赛ID
-        this.matchId = joinData.matchId;
-        
-        // 进入下一步
-        this.currentStep = 2;
-        
-        // 获取对手昵称（实际项目中应从响应中获取）
-        // 这里假设房主就是对手
-        this.opponentNickname = '房主';
-        
-      } catch (err) {
-        this.error = err.message || '加入房间时出错，请重试';
-        console.error('加入房间错误:', err);
       } finally {
         this.loading = false;
       }
@@ -877,6 +880,23 @@ export default {
   height: 100%;
   background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 100%);
   z-index: -1;
+}
+
+/* 用户ID显示 */
+.user-display {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}
+
+.user-id-badge {
+  background: #007aff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.3);
 }
 
 /* 房间选项样式 */
