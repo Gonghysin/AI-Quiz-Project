@@ -290,6 +290,8 @@
           this.error = '';
           this.successMessage = '';
           
+          console.log('准备发送登录请求:', { userId: this.userId.trim() });
+          
           // 调用登录接口
           const response = await fetch('/api/auth/login', {
             method: 'POST',
@@ -299,15 +301,39 @@
             body: JSON.stringify({ userId: this.userId.trim() })
           });
           
-          const data = await response.json();
+          console.log('登录响应状态:', response.status);
           
           if (!response.ok) {
-            throw new Error(data.message || '登录失败，请重试');
+            const errorText = await response.text();
+            console.error('登录响应错误:', errorText);
+            
+            let errorMessage = '登录失败，请重试';
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+              console.error('解析错误响应失败:', e);
+            }
+            
+            throw new Error(errorMessage);
+          }
+          
+          const responseText = await response.text();
+          console.log('登录响应内容:', responseText);
+          
+          let data;
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+            console.log('解析后的登录数据:', data);
+          } catch (e) {
+            console.error('解析响应JSON失败:', e);
+            throw new Error('无法解析服务器响应');
           }
           
           // 保存用户信息到本地存储
           localStorage.setItem('userId', data.userId);
           localStorage.setItem('nickname', data.nickname);
+          console.log('用户数据已保存到本地存储');
           
           // 重定向到匹配页面
           this.$router.push({ name: 'match' });
@@ -329,23 +355,52 @@
           this.error = '';
           this.successMessage = '';
           
+          const registerData = { 
+            userId: this.userId.trim(), 
+            nickname: this.nickname.trim() 
+          };
+          console.log('准备发送注册请求:', registerData);
+          
           // 调用注册接口
           const response = await fetch('/api/auth/register', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ userId: this.userId.trim(), nickname: this.nickname.trim() })
+            body: JSON.stringify(registerData)
           });
           
-          const data = await response.json();
+          console.log('注册响应状态:', response.status);
           
           if (!response.ok) {
-            throw new Error(data.message || '注册失败，请重试');
+            const errorText = await response.text();
+            console.error('注册响应错误:', errorText);
+            
+            let errorMessage = '注册失败，请重试';
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+              console.error('解析错误响应失败:', e);
+            }
+            
+            throw new Error(errorMessage);
+          }
+          
+          const responseText = await response.text();
+          console.log('注册响应内容:', responseText);
+          
+          let data;
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+            console.log('解析后的注册数据:', data);
+          } catch (e) {
+            console.error('解析响应JSON失败:', e);
+            throw new Error('无法解析服务器响应');
           }
           
           // 显示成功消息，并自动切换到登录页
-          this.successMessage = '注册成功！请登录开始游戏';
+          this.successMessage = data.message || '注册成功！请登录开始游戏';
           setTimeout(() => {
             this.isRegister = false;
           }, 1500);
