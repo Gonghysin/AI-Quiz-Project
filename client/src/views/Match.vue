@@ -505,7 +505,7 @@ export default {
             clearInterval(this.pollInterval);
             this.currentStep = 2;
             
-            // 获取对手昵称（实际项目中应从响应中获取）
+            // 获取对手昵称
             this.opponentNickname = data.opponentNickname || '对手';
           }
         } catch (err) {
@@ -566,8 +566,9 @@ export default {
           const response = await fetch(`/api/match/${this.matchId}/progress?user=${this.myId}`);
           const data = await response.json();
           
-          if (data.opponentSubmitted) {
-            // 对手已提交，停止轮询，准备进入下一步
+          // 检查对手是否提交了策略
+          if (data.opponentSubmittedStrategy) {
+            // 对手已提交策略，停止轮询，准备进入下一步
             this.bothReady = true;
             clearInterval(this.pollInterval);
             this.prepareForQuestionSelection();
@@ -646,7 +647,7 @@ export default {
           },
           body: JSON.stringify({
             userId: this.myId,
-            questions: this.selectedQuestions.map(q => q.id)
+            questions: this.selectedQuestions.map(q => q.questionId || q.id)
           })
         });
         
@@ -753,7 +754,7 @@ export default {
           const data = await response.json();
           
           if (data.opponentSubmitted) {
-            // 对手已提交，停止轮询，获取本轮结果
+            // 对手已提交答案，停止轮询，获取本轮结果
             clearInterval(this.pollInterval);
             this.fetchRoundResult();
           }
