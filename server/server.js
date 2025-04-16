@@ -1,7 +1,7 @@
 const app = require('./app');
 
 // 设置端口
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // 启动服务器
 app.listen(PORT, () => {

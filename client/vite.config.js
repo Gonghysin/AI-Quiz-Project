@@ -10,11 +10,11 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    port: 5174,
     open: true, // 自动打开浏览器
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5001',
         changeOrigin: true
       }
     }
