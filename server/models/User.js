@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 
 // 定义用户模式
 const userSchema = new mongoose.Schema({
-  id2050: {
+  userId: {
     type: String,
     required: true,
-    unique: true, // 确保2050 ID唯一
+    unique: true, // 确保用户ID唯一
     trim: true
   },
   nickname: {

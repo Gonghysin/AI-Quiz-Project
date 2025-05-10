@@ -20,15 +20,32 @@ const matchSchema = new Schema({
   },
   
   // 玩家策略选择 (cooperate=简单题, betray=难题)
-  user1_strategy: {
-    type: String,
-    enum: ['cooperate', 'betray'],
-    default: null
-  },
-  user2_strategy: {
-    type: String,
-    enum: ['cooperate', 'betray'],
-    default: null
+  // 支持两轮不同策略
+  strategies: {
+    round1: {
+      user1: {
+        type: String,
+        enum: ['cooperate', 'betray'],
+        default: null
+      },
+      user2: {
+        type: String,
+        enum: ['cooperate', 'betray'],
+        default: null
+      }
+    },
+    round2: {
+      user1: {
+        type: String,
+        enum: ['cooperate', 'betray'],
+        default: null
+      },
+      user2: {
+        type: String,
+        enum: ['cooperate', 'betray'],
+        default: null
+      }
+    }
   },
   
   // 玩家题目 (每轮两题，共两轮)
